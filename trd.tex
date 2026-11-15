@@ -1,0 +1,1844 @@
+% ICPC Team Reference Document (TRD) template
+% Compile with pdfLaTeX (twice if references are added).
+% Before printing, replace the team metadata below and check the final PDF page count.
+
+\documentclass[10pt,a4paper]{article}
+
+% ---------- Encoding and fonts ----------
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ---------- Page layout ----------
+\usepackage[
+a4paper,
+left=12mm,
+right=12mm,
+top=17mm,
+bottom=12mm,
+headheight=14pt,
+headsep=4mm
+]{geometry}
+\usepackage{fancyhdr}
+\usepackage{multicol}
+\setlength{\columnsep}{7mm}
+\setlength{\columnseprule}{0pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt plus 1pt}
+\raggedcolumns
+
+% ---------- Mathematics, tables, lists ----------
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,array}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+
+% ---------- Code ----------
+\usepackage{xcolor}
+\usepackage{listings}
+\lstdefinestyle{cpp}{
+	language=C++,
+	basicstyle=\ttfamily\footnotesize,
+	keywordstyle=\bfseries,
+	commentstyle=\itshape,
+	stringstyle=\ttfamily,
+	numbers=none,
+	tabsize=4,
+	keepspaces=true,
+	showstringspaces=false,
+	columns=fullflexible,
+	breaklines=true,
+	breakatwhitespace=false,
+	frame=single,
+	framerule=0.25pt,
+	framesep=3pt,
+	aboveskip=3pt,
+	belowskip=3pt
+}
+\lstset{style=cpp}
+
+% ---------- Compact headings ----------
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.45em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.4em}{}
+\titlespacing*{\section}{0pt}{5pt plus 2pt minus 1pt}{2pt}
+\titlespacing*{\subsection}{0pt}{4pt plus 1pt minus 1pt}{1pt}
+
+% ---------- Team metadata: EDIT THESE ----------
+\newcommand{\UniversityName}{Yaroslavl State University}
+% Sort surnames alphabetically, as required by the regional TRD rules.
+\newcommand{\TeamSurnames}{Chirkov, Rakushin, Vorobyov}
+\newcommand{\ContestName}{Central Russia Regional Contest}
+
+% ---------- Header: required metadata and page number ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize \UniversityName\ (\TeamSurnames)}
+\fancyhead[R]{\footnotesize \thepage}
+\renewcommand{\headrulewidth}{0.25pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{%
+	\fancyhf{}
+	\fancyhead[L]{\footnotesize \UniversityName\ (\TeamSurnames)}
+	\fancyhead[R]{\footnotesize \thepage}
+	\renewcommand{\headrulewidth}{0.25pt}
+}
+
+% ---------- Convenience commands ----------
+\newcommand{\complexity}[1]{\textit{Complexity:}~#1}
+\newcommand{\invariant}{\textit{Invariant:}~}
+\newcommand{\pitfall}{\textit{Pitfall:}~}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% Count physical pages shipped to the PDF and warn if the 25-page limit is exceeded.
+\newcounter{trdpagecount}
+\AddToHook{shipout/after}{\stepcounter{trdpagecount}}
+\AtEndDocument{%
+	\clearpage
+	\ifnum\value{trdpagecount}>25
+	\PackageWarningNoLine{TRD}{PDF has \arabic{trdpagecount} pages; regional limit is 25 single-sided A4 pages}
+	\fi
+}
+
+\begin{document}
+
+\subsection{FFT}
+
+Коэффициенты многочлена хранятся в порядке возрастания
+степеней: $P[i]$ — коэффициент при $x^i$.
+
+\complexity{Время: $O(n \log n)$, память: $O(n)$.}
+
+\begin{lstlisting}
+	struct cmpl{
+		double a, b;
+		cmpl(double a = 0, double b = 0): a(a), b(b) {}
+		
+		cmpl operator+(const cmpl &other) const{
+			return cmpl(a + other.a, b + other.b);
+		}
+		
+		cmpl operator-(const cmpl &other) const{
+			return cmpl(a - other.a, b - other.b);
+		}
+		
+		cmpl operator*(const cmpl &other) const{
+			return cmpl(a * other.a - b * other.b,
+			a * other.b + b * other.a);
+		}
+		
+		cmpl operator/(const double c) const{
+			return cmpl(a / c, b / c);
+		}
+		
+		double &real(){
+			return a;
+		}
+		
+		double &imag(){
+			return b;
+		}
+	};
+	
+	const double PI = atan2(0, -1);
+	vector<vector<cmpl>> w;
+	
+	void precompute_w(int max_level){
+		w.resize(max_level + 1);
+		w[0].resize(1, 1);
+		
+		for (int l = 1; l <= max_level; l++){
+			int n = (1 << l);
+			w[l].resize(n / 2);
+			
+			cmpl firstw(cos(2 * PI / n), sin(2 * PI / n));
+			
+			for (int j = 0; j < n / 2; j++){
+				if (j % 2 == 0){
+					w[l][j] = w[l - 1][j / 2];
+				}
+				else{
+					w[l][j] = w[l - 1][j / 2] * firstw;
+				}
+			}
+		}
+	}
+	
+	void fft(vector<cmpl> &P, bool inv = false){
+		int n = P.size();
+		int logn = 0;
+		
+		while ((1 << logn) != n){
+			logn++;
+		}
+		
+		vector<int> bit_rev(n);
+		bit_rev[0] = 0;
+		
+		for (int j = 1; j < n; j++){
+			bit_rev[j] = bit_rev[j / 2] / 2
+			+ ((j & 1) << (logn - 1));
+		}
+		
+		for (int j = 0; j < n; j++){
+			if (j < bit_rev[j]){
+				swap(P[bit_rev[j]], P[j]);
+			}
+		}
+		
+		for (int lvl = 1; lvl <= logn; lvl++){
+			int len = 1 << lvl;
+			int half = len >> 1;
+			
+			for (int st = 0; st < n; st += len){
+				for (int j = 0; j < half; j++){
+					cmpl tw = w[lvl][j];
+					
+					if (inv) tw.imag() = -tw.imag();
+					
+					cmpl u = P[st + j];
+					cmpl v = tw * P[st + j + half];
+					
+					P[st + j] = u + v;
+					P[st + j + half] = u - v;
+				}
+			}
+		}
+		
+		if (inv){
+			for (int i = 0; i < n; i++){
+				P[i] = P[i] / n;
+			}
+		}
+	}
+	
+	vector<ll> multiply(const vector<ll>& P,
+	const vector<ll>& Q) {
+		if (P.empty() || Q.empty()) return {};
+		
+		int need = (int)P.size() + (int)Q.size() - 1;
+		int n = 1, logn = 0;
+		
+		while (n < need) {
+			n *= 2;
+			logn++;
+		}
+		
+		precompute_w(logn);
+		
+		vector<cmpl> A(n);
+		
+		for (int j = 0; j < n; j++) {
+			A[j] = cmpl(
+			j < P.size() ? P[j] : 0,
+			j < Q.size() ? Q[j] : 0
+			);
+		}
+		
+		fft(A);
+		
+		for (int j = 0; j < n; j++) {
+			A[j] = A[j] * A[j];
+		}
+		
+		fft(A, true);
+		
+		vector<ll> R(need);
+		
+		for (int j = 0; j < need; j++) {
+			R[j] = llround(A[j].imag() / 2.0);
+		}
+		
+		return R;
+	}
+\end{lstlisting}
+
+\subsection{Dinic}
+
+\begin{lstlisting}[style=cpp]
+	#include <algorithm>
+	#include <cassert>
+	#include <limits>
+	#include <queue>
+	#include <vector>
+	using namespace std;
+	
+	template<typename T>
+	class max_flow {
+		public:
+		struct edge {
+			int to, rev;
+			T capacity, flow;
+		};
+		
+		struct path {
+			T flow;
+			vector<int> path, edges;
+		};
+		
+		private:
+		int n;
+		vector<vector<edge>> g;
+		vector<int> dist, head;
+		int source = -1, sink = -1;
+		
+		bool bfs() {
+			dist.assign(n, n);
+			dist[source] = 0;
+			vector<int> que{source};
+			
+			for (int ptr = 0; ptr < (int)que.size(); ptr++) {
+				int v = que[ptr];
+				
+				for (const auto &[u, rev, capacity, flow] : g[v]) {
+					if (dist[u] > dist[v] + 1 && flow < capacity) {
+						dist[u] = dist[v] + 1;
+						que.push_back(u);
+					}
+				}
+			}
+			
+			return dist[sink] != n;
+		}
+		
+		T dfs(int v, T f) {
+			if (v == sink)
+			return f;
+			
+			for (; head[v] < (int)g[v].size(); head[v]++) {
+				auto &[u, rev, capacity, flow] = g[v][head[v]];
+				
+				if (dist[u] == dist[v] + 1 && flow < capacity) {
+					if (T delta = dfs(u, min(f, capacity - flow))) {
+						flow += delta;
+						g[u][rev].flow -= delta;
+						return delta;
+					}
+				}
+			}
+			
+			return 0;
+		}
+		
+		// Requires the positive-flow graph to be acyclic.
+		// Can recurse infinitely if there are positive-flow cycles.
+		T decompose_dfs_acyclic(
+		int v, T f,
+		vector<int> &vertices,
+		vector<int> &edge_ids
+		) {
+			if (v == sink) {
+				vertices.push_back(sink);
+				return f;
+			}
+			
+			for (; head[v] < (int)g[v].size(); head[v]++) {
+				auto &[u, rev, capacity, flow] = g[v][head[v]];
+				
+				if (flow > 0) {
+					if (T delta = decompose_dfs_acyclic(
+					u, min(f, flow), vertices, edge_ids
+					)) {
+						flow -= delta;
+						g[u][rev].flow += delta;
+						
+						vertices.push_back(v);
+						edge_ids.push_back(head[v]);
+						return delta;
+					}
+				}
+			}
+			
+			return 0;
+		}
+		
+		public:
+		max_flow(int n = 0) : n(n), g(n) {}
+		
+		int size() const {
+			return n;
+		}
+		
+		// Returns an index of the added edge in g[from].
+		int add(
+		int from, int to,
+		T forward_capacity,
+		T backward_capacity = 0
+		) {
+			assert(0 <= from && from < n);
+			assert(0 <= to && to < n);
+			assert(forward_capacity >= 0);
+			assert(backward_capacity >= 0);
+			
+			int id = (int)g[from].size();
+			
+			g[from].push_back({
+				to, (int)g[to].size() + (from == to),
+				forward_capacity, 0
+			});
+			
+			g[to].push_back({
+				from, id, backward_capacity, 0
+			});
+			
+			return id;
+		}
+		
+		// Returns i-th edge of vertex v.
+		edge get_edge(int v, int id) const {
+			return g[v][id];
+		}
+		
+		void clear_flow() {
+			for (int v = 0; v < n; v++) {
+				for (auto &e : g[v]) {
+					e.flow = 0;
+				}
+			}
+		}
+		
+		// U must be able to store the total maximum flow.
+		// If source or sink changes, call clear_flow() first.
+		template<typename U>
+		U solve(int source_, int sink_) {
+			assert(0 <= source_ && source_ < n);
+			assert(0 <= sink_ && sink_ < n);
+			assert(source_ != sink_);
+			
+			source = source_;
+			sink = sink_;
+			
+			U flow = 0;
+			
+			while (bfs()) {
+				head.assign(n, 0);
+				
+				while (T delta = dfs(
+				source, numeric_limits<T>::max()
+				)) {
+					flow += delta;
+				}
+			}
+			
+			return flow;
+		}
+		
+		// Returns true if v belongs to the source side of mincut.
+		// Requires solve() to be called before.
+		bool left_of_mincut(int v) const {
+			return dist[v] != n;
+		}
+		
+		// Fast decomposition.
+		// Requires the positive-flow graph to be acyclic.
+		vector<path> decompose_dfs_acyclic() {
+			assert(source != -1 && sink != -1);
+			
+			vector<path> paths;
+			vector<int> vertices, edge_ids;
+			
+			head.assign(n, 0);
+			
+			while (T flow = decompose_dfs_acyclic(
+			source,
+			numeric_limits<T>::max(),
+			vertices,
+			edge_ids
+			)) {
+				reverse(vertices.begin(), vertices.end());
+				reverse(edge_ids.begin(), edge_ids.end());
+				
+				paths.push_back({flow, vertices, edge_ids});
+				
+				vertices.clear();
+				edge_ids.clear();
+			}
+			
+			return paths;
+		}
+		
+		// General decomposition.
+		// Works even if the positive-flow graph contains cycles.
+		vector<path> decompose_bfs_general() {
+			assert(source != -1 && sink != -1);
+			
+			vector<path> paths;
+			
+			while (true) {
+				vector<int> pv(n, -1), pe(n, -1);
+				queue<int> q;
+				
+				pv[source] = source;
+				q.push(source);
+				
+				// Find a path using only positive-flow edges.
+				while (!q.empty() && pv[sink] == -1) {
+					int v = q.front();
+					q.pop();
+					
+					for (int id = 0; id < (int)g[v].size(); id++) {
+						const edge &e = g[v][id];
+						
+						if (e.flow <= 0 || pv[e.to] != -1)
+						continue;
+						
+						pv[e.to] = v;
+						pe[e.to] = id;
+						q.push(e.to);
+					}
+				}
+				
+				if (pv[sink] == -1)
+				break;
+				
+				// Find the bottleneck.
+				T pushed = numeric_limits<T>::max();
+				
+				for (int v = sink; v != source; v = pv[v]) {
+					pushed = min(
+					pushed,
+					g[pv[v]][pe[v]].flow
+					);
+				}
+				
+				path cur;
+				cur.flow = pushed;
+				
+				// Subtract the extracted path from the flow.
+				for (int v = sink; v != source; v = pv[v]) {
+					int p = pv[v];
+					int id = pe[v];
+					
+					int to = g[p][id].to;
+					int rev = g[p][id].rev;
+					
+					g[p][id].flow -= pushed;
+					g[to][rev].flow += pushed;
+					
+					cur.path.push_back(v);
+					cur.edges.push_back(id);
+				}
+				
+				cur.path.push_back(source);
+				
+				reverse(cur.path.begin(), cur.path.end());
+				reverse(cur.edges.begin(), cur.edges.end());
+				
+				paths.push_back(cur);
+			}
+			
+			return paths;
+		}
+	};
+\end{lstlisting}
+
+\subsection*{Suffix Array}
+
+\begin{lstlisting}[style=cpp]
+	struct suffix_array {
+		string s;
+		int n;
+		vector<int> p, c;
+		
+		suffix_array(string s = "") {
+			build(s);
+		}
+		
+		void radix_sort(vector<pair<pair<int, int>, int>> &cc) {
+			int n = cc.size();
+			
+			{
+				vector<int> cnt(n);
+				
+				for (auto x : cc) {
+					cnt[x.first.second]++;
+				}
+				
+				vector<pair<pair<int, int>, int>> cc_nxt(n);
+				vector<int> pos(n);
+				
+				pos[0] = 0;
+				for (int i = 1; i < n; i++) {
+					pos[i] = pos[i - 1] + cnt[i - 1];
+				}
+				
+				for (auto x : cc) {
+					int i = x.first.second;
+					cc_nxt[pos[i]] = x;
+					pos[i]++;
+				}
+				
+				cc = cc_nxt;
+			}
+			
+			{
+				vector<int> cnt(n);
+				
+				for (auto x : cc) {
+					cnt[x.first.first]++;
+				}
+				
+				vector<pair<pair<int, int>, int>> cc_nxt(n);
+				vector<int> pos(n);
+				
+				pos[0] = 0;
+				for (int i = 1; i < n; i++) {
+					pos[i] = pos[i - 1] + cnt[i - 1];
+				}
+				
+				for (auto x : cc) {
+					int i = x.first.first;
+					cc_nxt[pos[i]] = x;
+					pos[i]++;
+				}
+				
+				cc = cc_nxt;
+			}
+		}
+		
+		void build(string str) {
+			s = str;
+			s += "$";
+			
+			n = s.size();
+			
+			p.resize(n);
+			c.resize(n);
+			
+			vector<pair<char, int>> temp(n);
+			
+			for (int i = 0; i < n; i++) {
+				temp[i] = {s[i], i};
+			}
+			
+			sort(temp.begin(), temp.end());
+			
+			p[0] = temp[0].second;
+			
+			for (int i = 1; i < n; i++) {
+				p[i] = temp[i].second;
+				
+				if (temp[i].first == temp[i - 1].first) {
+					c[temp[i].second] = c[temp[i - 1].second];
+				}
+				else {
+					c[temp[i].second] = c[temp[i - 1].second] + 1;
+				}
+			}
+			
+			vector<pair<pair<int, int>, int>> cc(n);
+			
+			int k = 0;
+			
+			while ((1 << k) < n) {
+				for (int i = 0; i < n; i++) {
+					cc[i] = {{c[i], c[(i + (1 << k)) % n]}, i};
+				}
+				
+				radix_sort(cc);
+				
+				p[0] = cc[0].second;
+				
+				for (int i = 1; i < n; i++) {
+					p[i] = cc[i].second;
+					
+					if (cc[i].first == cc[i - 1].first) {
+						c[cc[i].second] = c[cc[i - 1].second];
+					}
+					else {
+						c[cc[i].second] = c[cc[i - 1].second] + 1;
+					}
+				}
+				
+				k++;
+			}
+		}
+		
+		vector<int> get_sa() const {
+			return p;
+		}
+	};
+\end{lstlisting}
+
+\complexity{Время: $O(n\log n)$, память: $O(n)$.}
+
+\pitfall Символ \texttt{\$} должен отсутствовать в исходной строке и быть лексикографически меньше всех её символов.
+
+\subsection*{Extended Euclidean Algorithm}
+
+\begin{lstlisting}[style=cpp]
+	ll gcd(ll a, ll b, ll &x, ll &y) {
+		if (a == 0) {
+			x = 0;
+			y = 1;
+			return b;
+		}
+		
+		ll x1, y1;
+		ll d = gcd(b % a, a, x1, y1);
+		
+		x = y1 - (b / a) * x1;
+		y = x1;
+		
+		return d;
+	}
+\end{lstlisting}
+
+\complexity{Time: $O(\log \min(a,b))$, memory: $O(\log \min(a,b))$.}
+\subsection*{Z-function}
+
+\begin{lstlisting}[style=cpp]
+	vector<int> z_func(string &s) {
+		int n = s.size();
+		vector<int> z(n, 0);
+		
+		for (int i = 1, l = 0, r = 0; i < n; i++) {
+			if (i <= r) {
+				z[i] = min(r - i + 1, z[i - l]);
+			}
+			
+			while (i + z[i] < n &&
+			s[z[i]] == s[i + z[i]]) {
+				++z[i];
+			}
+			
+			if (i + z[i] - 1 > r) {
+				l = i;
+				r = i + z[i] - 1;
+			}
+		}
+		
+		return z;
+	}
+\end{lstlisting}
+
+\complexity{Time: $O(n)$, memory: $O(n)$.}
+
+\subsection*{Prefix Function}
+
+\begin{lstlisting}[style=cpp]
+	vector<ll> pref_func(string &s) {
+		vector<ll> pref(s.size());
+		
+		for (int i = 1; i < (int)s.size(); i++) {
+			ll k = pref[i - 1];
+			
+			while (k && s[k] != s[i]) {
+				k = pref[k - 1];
+			}
+			
+			if (s[k] == s[i]) {
+				pref[i] = k + 1;
+			}
+		}
+		
+		return pref;
+	}
+\end{lstlisting}
+
+\complexity{Time: $O(n)$, memory: $O(n)$.}
+
+\subsection*{Aho-Corasick}
+
+\begin{lstlisting}[style=cpp]
+	struct aho_corasick {
+		static const int alp = 26;
+		
+		struct node {
+			node *tr[alp]{};
+			node *suff_link = nullptr;
+			node *to_pr = nullptr;
+			int len = 0;
+			vector<int> pr;
+		};
+		
+		vector<unique_ptr<node>> nodes;
+		node *root;
+		bool built = false;
+		
+		node* new_node() {
+			nodes.push_back(make_unique<node>());
+			return nodes.back().get();
+		}
+		
+		node* fnd(node *now, int need) {
+			while (now != root && now->tr[need] == nullptr) {
+				now = now->suff_link;
+			}
+			
+			if (now->tr[need] != nullptr) {
+				return now->tr[need];
+			}
+			
+			return root;
+		}
+		
+		public:
+		aho_corasick() {
+			root = new_node();
+			root->suff_link = root;
+			root->to_pr = root;
+		}
+		
+		void add(const string &s, int id) {
+			assert(!built);
+			
+			node *now = root;
+			
+			for (char ch : s) {
+				int c = ch - 'a';
+				assert(0 <= c && c < alp);
+				
+				if (now->tr[c] == nullptr) {
+					now->tr[c] = new_node();
+					now->tr[c]->len = now->len + 1;
+				}
+				
+				now = now->tr[c];
+			}
+			
+			now->pr.push_back(id);
+		}
+		
+		void build() {
+			assert(!built);
+			
+			queue<node*> q;
+			
+			for (int i = 0; i < alp; i++) {
+				if (root->tr[i] != nullptr) {
+					root->tr[i]->suff_link = root;
+					root->tr[i]->to_pr = root;
+					q.push(root->tr[i]);
+				}
+			}
+			
+			while (!q.empty()) {
+				node *now = q.front();
+				q.pop();
+				
+				for (int i = 0; i < alp; i++) {
+					if (now->tr[i] == nullptr) {
+						continue;
+					}
+					
+					node *u = now->tr[i];
+					
+					u->suff_link = fnd(now->suff_link, i);
+					
+					if (!u->suff_link->pr.empty()) {
+						u->to_pr = u->suff_link;
+					}
+					else {
+						u->to_pr = u->suff_link->to_pr;
+					}
+					
+					q.push(u);
+				}
+			}
+			
+			built = true;
+		}
+		
+		vector<vector<int>> find(
+		const string &text, int cnt
+		) const {
+			assert(built);
+			
+			vector<vector<int>> ans(cnt);
+			node *now = root;
+			
+			for (int i = 0; i < (int)text.size(); i++) {
+				int c = text[i] - 'a';
+				assert(0 <= c && c < alp);
+				
+				while (now != root && now->tr[c] == nullptr) {
+					now = now->suff_link;
+				}
+				
+				if (now->tr[c] != nullptr) {
+					now = now->tr[c];
+				}
+				else {
+					now = root;
+				}
+				
+				for (node *u = now; u != root; u = u->to_pr) {
+					for (int id : u->pr) {
+						ans[id].push_back(i - u->len + 1);
+					}
+				}
+			}
+			
+			return ans;
+		}
+	};
+\end{lstlisting}
+
+\complexity{Добавление образцов: $O(S)$. Построение суффиксных ссылок: $O(VH)$ в худшем случае. Поиск: $O(T+Z)$. Память: $O(26V+Z)$.}
+
+\subsection*{Fermat Primality Test}
+
+\begin{lstlisting}[style=cpp]
+	ll mult(ll a, ll b, ll mod) {
+		return (__int128)a * b % mod;
+	}
+	
+	ll bin_pow(ll a, ll n, ll mod) {
+		ll res = 1;
+		
+		while (n > 0) {
+			if (n % 2) {
+				res = mult(res, a, mod);
+			}
+			
+			n /= 2;
+			a = mult(a, a, mod);
+		}
+		
+		return res;
+	}
+	
+	bool is_prime_fermat(ll n, int iterations = 50) {
+		if (n < 2) return false;
+		if (n <= 3) return true;
+		if (n % 2 == 0) return false;
+		
+		// Trial division up to cube root.
+		for (ll i = 3; (__int128)i * i * i <= n; i += 2) {
+			if (n % i == 0) {
+				return false;
+			}
+		}
+		
+		static mt19937_64 rng(
+		chrono::steady_clock::now().time_since_epoch().count()
+		);
+		
+		for (int i = 0; i < iterations; i++) {
+			ll a = uniform_int_distribution<ll>(2, n - 2)(rng);
+			
+			if (std::gcd(a, n) != 1) {
+				return false;
+			}
+			
+			if (bin_pow(a, n - 1, n) != 1) {
+				return false;
+			}
+		}
+		
+		return true;
+	}
+\end{lstlisting}
+
+\complexity{Время: $O(n^{1/3} + k\log n)$, память: $O(1)$, где $k$ — количество итераций.}
+
+\pitfall Вероятностный алгоритм: после предварительной проверки до кубического корня оставшиеся составные числа не являются числами Кармайкла. Вероятность ошибки при независимом равномерном выборе оснований не превосходит $2^{-k}$.
+
+\subsection*{Implicit Treap}
+
+\begin{lstlisting}[style=cpp]
+	class Treap {
+		static mt19937_64 generator;
+		
+		struct node {
+			node *left = 0, *right = 0;
+			ll value, mmin, sum, add;
+			ll size, prio;
+			
+			node(ll v) : value(v), mmin(v), sum(v),
+			size(1), prio(generator()), add(0LL) {}
+		};
+		
+		node *head = 0;
+		
+		static ll get_size(node *ver) {
+			return ver ? ver->size : 0;
+		}
+		
+		static ll get_min(node *ver) {
+			return ver ? ver->mmin : numeric_limits<ll>::max();
+		}
+		
+		static ll get_sum(node *ver) {
+			return ver ? ver->sum : 0LL;
+		}
+		
+		static void push(node *ver) {
+			if (!ver)
+			return;
+			
+			if (ver->add) {
+				ver->mmin += ver->add;
+				ver->value += ver->add;
+				ver->sum += ver->size * ver->add;
+				
+				if (ver->left)
+				ver->left->add += ver->add;
+				
+				if (ver->right)
+				ver->right->add += ver->add;
+				
+				ver->add = 0;
+			}
+		}
+		
+		static void update(node *ver) {
+			if (ver) {
+				push(ver->left);
+				push(ver->right);
+				
+				ver->size = 1 + get_size(ver->left)
+				+ get_size(ver->right);
+				
+				ver->mmin = min(ver->value,
+				min(get_min(ver->left),
+				get_min(ver->right)));
+				
+				ver->sum = ver->value
+				+ get_sum(ver->left)
+				+ get_sum(ver->right);
+			}
+		}
+		
+		static node* merge(node *a, node *b) {
+			push(a);
+			push(b);
+			
+			if (!a || !b)
+			return a ? a : b;
+			
+			if (a->prio > b->prio) {
+				a->right = merge(a->right, b);
+				update(a);
+				return a;
+			}
+			else {
+				b->left = merge(a, b->left);
+				update(b);
+				return b;
+			}
+		}
+		
+		static void split(
+		node *ver, int k, node *&a, node *&b
+		) {
+			push(ver);
+			
+			if (!ver) {
+				a = 0;
+				b = 0;
+				return;
+			}
+			
+			if (get_size(ver->left) < k) {
+				split(ver->right,
+				k - get_size(ver->left) - 1,
+				ver->right, b);
+				a = ver;
+			}
+			else {
+				split(ver->left, k, a, ver->left);
+				b = ver;
+			}
+			
+			update(a);
+			update(b);
+		}
+		
+		public:
+		void insert(int index, ll value) {
+			node *less = 0, *greater = 0;
+			
+			split(head, index, less, greater);
+			
+			head = merge(
+			merge(less, new node(value)),
+			greater
+			);
+		}
+		
+		void add_range(int left, int right, ll new_value) {
+			node *less = 0, *need = 0, *greater = 0;
+			
+			split(head, right + 1, less, greater);
+			split(less, left, less, need);
+			
+			need->add += new_value;
+			
+			head = merge(merge(less, need), greater);
+		}
+		
+		void swap_ranges(int l1, int r1, int l2, int r2) {
+			node *a = 0, *b = 0;
+			node *h1 = 0, *h2 = 0, *h3 = 0;
+			
+			split(head, r2 + 1, b, h3);
+			split(b, l2, h2, b);
+			split(h2, r1 + 1, a, h2);
+			split(a, l1, h1, a);
+			
+			head = merge(h1, b);
+			head = merge(head, h2);
+			head = merge(head, a);
+			head = merge(head, h3);
+		}
+		
+		ll min_req(int left, int right) {
+			node *less = 0, *greater = 0, *need = 0;
+			
+			split(head, right + 1, less, greater);
+			split(less, left, less, need);
+			
+			ll ans = get_min(need);
+			
+			head = merge(merge(less, need), greater);
+			
+			return ans;
+		}
+		
+		ll sum_req(int left, int right) {
+			node *less = 0, *greater = 0, *need = 0;
+			
+			split(head, right + 1, less, greater);
+			split(less, left, less, need);
+			
+			ll ans = get_sum(need);
+			
+			head = merge(merge(less, need), greater);
+			
+			return ans;
+		}
+	};
+	
+	mt19937_64 Treap::generator;
+\end{lstlisting}
+
+\complexity{Expected time per operation: $O(\log n)$. Memory: $O(n)$.}
+
+\subsection*{Kuhn's Algorithm}
+
+\begin{lstlisting}[style=cpp]
+	struct kuhn {
+		int n_left, n_right;
+		int timer = 0;
+		
+		vector<vector<int>> graph1;
+		vector<int> mt1, was1;
+		
+		kuhn(int n_left, int n_right)
+		: n_left(n_left), n_right(n_right),
+		graph1(n_left), mt1(n_right, -1),
+		was1(n_left, 0) {}
+		
+		void add_edge(int u, int v) {
+			graph1[u].push_back(v);
+		}
+		
+		bool try_kuhn1(int ver) {
+			if (was1[ver] == timer) {
+				return false;
+			}
+			
+			was1[ver] = timer;
+			
+			for (int to : graph1[ver]) {
+				if (mt1[to] == -1 || try_kuhn1(mt1[to])) {
+					mt1[to] = ver;
+					return true;
+				}
+			}
+			
+			return false;
+		}
+		
+		int max_matching() {
+			fill(mt1.begin(), mt1.end(), -1);
+			
+			int ans = 0;
+			
+			for (int i = 0; i < n_left; i++) {
+				++timer;
+				
+				if (try_kuhn1(i)) {
+					ans++;
+				}
+			}
+			
+			return ans;
+		}
+	};
+\end{lstlisting}
+
+\complexity{Время: $O(L(E+1))$, память: $O(L+R+E)$.}
+
+\subsection*{Fenwick Tree (1D)}
+
+\begin{lstlisting}[style=cpp]
+	struct fenwick {
+		int n;
+		vector<ll> F;
+		
+		fenwick(int n) : n(n), F(n + 1, 0) {}
+		
+		void update(int x, ll val = 1) {
+			for (; x <= n; x += (x & -x)) {
+				F[x] += val;
+			}
+		}
+		
+		// Sum on prefix [1, x].
+		ll sum(int x) {
+			ll s = 0;
+			
+			for (; x > 0; x -= (x & -x)) {
+				s += F[x];
+			}
+			
+			return s;
+		}
+		
+		// Sum on segment [l, r].
+		ll query(int l, int r) {
+			return sum(r) - sum(l - 1);
+		}
+	};
+\end{lstlisting}
+
+\complexity{Update: $O(\log n)$, query: $O(\log n)$, memory: $O(n)$.}
+
+\subsection*{Fenwick Tree (2D)}
+
+\begin{lstlisting}[style=cpp]
+	struct fenwick2d {
+		int n, m;
+		vector<vector<ll>> F;
+		
+		fenwick2d(int n, int m)
+		: n(n), m(m), F(n + 1, vector<ll>(m + 1, 0)) {}
+		
+		void update(int x, int y, ll val = 1) {
+			for (int i = x; i <= n; i += (i & -i)) {
+				for (int j = y; j <= m; j += (j & -j)) {
+					F[i][j] += val;
+				}
+			}
+		}
+		
+		// Sum on rectangle [1, x] x [1, y].
+		ll sum(int x, int y) {
+			ll s = 0;
+			
+			for (int i = x; i > 0; i -= (i & -i)) {
+				for (int j = y; j > 0; j -= (j & -j)) {
+					s += F[i][j];
+				}
+			}
+			
+			return s;
+		}
+		
+		// Sum on rectangle [x1, x2] x [y1, y2].
+		ll query(int x1, int y1, int x2, int y2) {
+			return sum(x2, y2)
+			- sum(x1 - 1, y2)
+			- sum(x2, y1 - 1)
+			+ sum(x1 - 1, y1 - 1);
+		}
+	};
+\end{lstlisting}
+
+\complexity{Update: $O(\log n\log m)$, query: $O(\log n\log m)$, memory: $O(nm)$.}
+
+\subsection*{Convex Polygon: Tangents and Point Inclusion}
+
+\begin{lstlisting}[style=cpp]
+	template<typename T>
+	struct point {
+		T x, y;
+		
+		point() : x(0), y(0) {}
+		point(T x, T y) : x(x), y(y) {}
+		
+		point operator-(const point &other) const {
+			return point(x - other.x, y - other.y);
+		}
+	};
+	
+	template<typename T>
+	__int128 crs(const point<T> &a, const point<T> &b) {
+		return (__int128)a.x * b.y -
+		(__int128)a.y * b.x;
+	}
+	
+	// Returns indices of two tangent vertices.
+	// p must be strictly outside the polygon.
+	pair<ll, ll> find_tangents(
+	point<ll> p, const vector<point<ll>> &po
+	) {
+		ll n = po.size();
+		assert(n >= 3);
+		
+		ll i, j, k, w;
+		point<ll> a, b, c;
+		
+		auto magic = [&](ll coef) {
+			k = 1;
+			j = 0;
+			
+			while (k < n) {
+				j++;
+				k *= 2;
+			}
+			
+			w = 0;
+			
+			for (i = j; i >= 0; --i) {
+				a = po[(n + n + w - k) % n];
+				b = po[w];
+				c = po[(w + k) % n];
+				
+				if (crs(a - p, b - p) * coef >= 0) {
+					if (crs(a - p, c - p) * coef >= 0) {
+						w = (n + n + w - k) % n;
+					}
+					else {
+						w = (w + k) % n;
+					}
+				}
+				else {
+					if (crs(c - p, b - p) * coef >= 0) {
+						w = (w + k) % n;
+					}
+				}
+				
+				k /= 2;
+			}
+			
+			return w;
+		};
+		
+		pair<ll, ll> res;
+		res.first = magic(1);
+		res.second = magic(-1);
+		
+		return res;
+	}
+	
+	// Checks whether p belongs to the convex polygon.
+	// The boundary is considered inside.
+	bool point_in_pol(
+	point<ll> p, const vector<point<ll>> &po
+	) {
+		ll n = po.size();
+		
+		if (n < 3)
+		return false;
+		
+		ll left = 1, right = n - 2, mid, pos;
+		
+		while (right - left > 1) {
+			mid = (right + left) / 2;
+			
+			if (crs(po[mid] - po[0], p - po[0]) >= 0) {
+				left = mid;
+			}
+			else {
+				right = mid;
+			}
+		}
+		
+		if (crs(po[right] - po[0], p - po[0]) >= 0) {
+			pos = right;
+		}
+		else {
+			if (crs(po[left] - po[0], p - po[0]) >= 0) {
+				pos = left;
+			}
+			else {
+				return false;
+			}
+		}
+		
+		if (crs(p - po[0], po[pos + 1] - po[0]) >= 0 &&
+		crs(po[pos + 1] - po[pos], p - po[pos]) >= 0) {
+			return true;
+		}
+		
+		return false;
+	}
+\end{lstlisting}
+
+\complexity{Both algorithms: $O(\log n)$ time and $O(1)$ auxiliary memory.}
+
+
+\subsection*{Primitive Root}
+
+\begin{lstlisting}[style=cpp]
+	ll primitive_root(ll m) {
+		if (m < 2) return -1;
+		if (m == 2) return 1;
+		
+		auto factorize = [](ll x) {
+			vector<ll> res;
+			
+			for (ll i = 2; i <= x / i; i++) {
+				while (x % i == 0) {
+					res.push_back(i);
+					x /= i;
+				}
+			}
+			
+			if (x > 1) res.push_back(x);
+			
+			return res;
+		};
+		
+		auto has_primitive = [&](ll x) {
+			if (x == 2 || x == 4) return true;
+			
+			vector<ll> s = factorize(x);
+			
+			if (s.size() == 1) return true;
+			
+			if (s[0] == 2) {
+				if (s[1] == 2) return false;
+				
+				for (int i = 1; i < (int)s.size(); i++) {
+					if (s[i] != s[1]) return false;
+				}
+				
+				return true;
+			}
+			
+			for (int i = 0; i < (int)s.size(); i++) {
+				if (s[i] != s[0]) return false;
+			}
+			
+			return true;
+		};
+		
+		auto phi = [](ll x) {
+			ll ans = 1;
+			
+			for (ll i = 2; i <= x / i; i++) {
+				if (x % i == 0) {
+					ll tt = i - 1;
+					x /= i;
+					
+					while (x % i == 0) {
+						tt *= i;
+						x /= i;
+					}
+					
+					ans *= tt;
+				}
+			}
+			
+			if (x > 1) ans *= (x - 1);
+			
+			return ans;
+		};
+		
+		auto mult = [](ll a, ll b, ll mod) {
+			return (__int128)a * b % mod;
+		};
+		
+		auto bin_pow = [&](ll a, ll n, ll mod) {
+			ll res = 1;
+			
+			while (n) {
+				if (n & 1) {
+					res = mult(res, a, mod);
+				}
+				
+				a = mult(a, a, mod);
+				n >>= 1;
+			}
+			
+			return res;
+		};
+		
+		auto gcd = [](ll a, ll b) {
+			while (b) {
+				ll t = a % b;
+				a = b;
+				b = t;
+			}
+			
+			return a;
+		};
+		
+		if (!has_primitive(m)) return -1;
+		
+		ll ph = phi(m);
+		vector<ll> factors = factorize(ph);
+		
+		vector<ll> p;
+		
+		for (int i = 0; i < (int)factors.size(); i++) {
+			if (i == 0 || factors[i] != factors[i - 1]) {
+				p.push_back(ph / factors[i]);
+			}
+		}
+		
+		for (ll g = 2; g < m; g++) {
+			if (gcd(g, m) != 1) continue;
+			
+			bool flag = true;
+			
+			for (ll c : p) {
+				if (bin_pow(g, c, m) == 1) {
+					flag = false;
+					break;
+				}
+			}
+			
+			if (flag) return g;
+		}
+		
+		return -1;
+	}
+\end{lstlisting}
+
+\complexity{Время: $O(\sqrt m + G\cdot\omega(\varphi(m))\log m)$, память: $O(\log m)$, где $G$ — ответ, $\omega(x)$ — количество различных простых делителей $x$.}
+
+Дан модуль $m$ и числа $a,b$. Необходимо найти минимальное
+неотрицательное целое число $x$, удовлетворяющее сравнению
+\[
+a^x \equiv b \pmod m.
+\]
+Функция возвращает $-1$, если решения не существует.
+Предполагается, что $\gcd(a,m)=1$.
+
+Используется алгоритм Baby-step Giant-step (BSGS).
+
+\complexity{Время: $O(\sqrt m\log m)$, память: $O(\sqrt m)$.}
+
+\subsection*{Discrete Logarithm (BSGS)}
+
+\begin{lstlisting}[style=cpp]
+	ll discrete_log(ll a, ll b, ll mod) {
+		if (mod == 1) return 0;
+		
+		assert(mod > 0);
+		
+		a %= mod;
+		b %= mod;
+		
+		if (a < 0) a += mod;
+		if (b < 0) b += mod;
+		
+		ll g = a, h = mod;
+		while (h) {
+			ll t = g % h;
+			g = h;
+			h = t;
+		}
+		
+		if (g != 1) return -1;
+		
+		auto mul = [mod](ll x, ll y) {
+			return (ll)((__int128)x * y % mod);
+		};
+		
+		auto bin_pow = [&](ll x, ll n) {
+			ll res = 1;
+			
+			while (n) {
+				if (n & 1) res = mul(res, x);
+				x = mul(x, x);
+				n >>= 1;
+			}
+			
+			return res;
+		};
+		
+		auto get_inv = [&](ll x) {
+			__int128 r0 = x, r1 = mod;
+			__int128 x0 = 1, x1 = 0;
+			
+			while (r1) {
+				__int128 q = r0 / r1;
+				
+				__int128 nr = r0 - q * r1;
+				r0 = r1;
+				r1 = nr;
+				
+				__int128 nx = x0 - q * x1;
+				x0 = x1;
+				x1 = nx;
+			}
+			
+			if (r0 != 1) return -1LL;
+			
+			x0 %= mod;
+			if (x0 < 0) x0 += mod;
+			
+			return (ll)x0;
+		};
+		
+		ll s = sqrtl((long double)mod);
+		while ((__int128)s * s < mod) s++;
+		
+		vector<pair<ll, ll>> baby;
+		
+		ll cur = 1;
+		for (ll j = 0; j < s; j++) {
+			baby.push_back({cur, j});
+			cur = mul(cur, a);
+		}
+		
+		sort(baby.begin(), baby.end());
+		
+		ll giant = get_inv(bin_pow(a, s));
+		cur = b;
+		
+		for (ll i = 0; i < s; i++) {
+			auto it = lower_bound(
+			baby.begin(), baby.end(), make_pair(cur, -1LL)
+			);
+			
+			if (it != baby.end() && it->first == cur) {
+				return i * s + it->second;
+			}
+			
+			cur = mul(cur, giant);
+		}
+		
+		return -1;
+	}
+\end{lstlisting}
+
+\complexity{Time: $O(\sqrt{mod}\log mod)$, memory: $O(\sqrt{mod})$.}
+
+\subsection*{Modular Roots}
+
+Даны простое число $p$, целые числа $a$ и $k$.
+Необходимо найти все решения сравнения
+\[
+x^k \equiv a \pmod p.
+\]
+Возвращается вектор всех различных корней в отсортированном порядке.
+
+\begin{lstlisting}[style=cpp]
+	vector<ll> modular_roots(ll a, ll k, ll p) {
+		assert(p >= 2 && k >= 1);
+		
+		a %= p;
+		if (a < 0) a += p;
+		
+		if (a == 0) return {0};
+		
+		ll g = primitive_root(p);
+		ll t = discrete_log(g, a, p);
+		
+		if (t == -1) return {};
+		
+		ll n = p - 1;
+		ll d = std::gcd(k, n);
+		
+		if (t % d != 0) return {};
+		
+		ll kk = k / d;
+		ll nn = n / d;
+		ll tt = t / d;
+		
+		// Find inverse of kk modulo nn.
+		ll x, y;
+		gcd(kk, nn, x, y);
+		
+		ll y0 = 0;
+		
+		if (nn > 1) {
+			x %= nn;
+			if (x < 0) x += nn;
+			
+			y0 = (__int128)(tt % nn) * x % nn;
+		}
+		
+		auto mul_mod = [p](ll a, ll b) {
+			return (ll)((__int128)a * b % p);
+		};
+		
+		auto bin_pow = [&](ll a, ll n) {
+			ll res = 1;
+			
+			while (n) {
+				if (n & 1) res = mul_mod(res, a);
+				a = mul_mod(a, a);
+				n >>= 1;
+			}
+			
+			return res;
+		};
+		
+		vector<ll> ans;
+		
+		for (ll i = 0; i < d; i++) {
+			ll exp = y0 + i * nn;
+			ans.push_back(bin_pow(g, exp));
+		}
+		
+		sort(ans.begin(), ans.end());
+		
+		return ans;
+	}
+\end{lstlisting}
+
+\complexity{Дополнительно к поиску первообразного корня: $O(\sqrt p\log p+d\log p)$, память: $O(\sqrt p+d)$, где $d=\gcd(k,p-1)$.}
+
+\subsection*{Persistent Segment Tree}
+
+Персистентное дерево отрезков позволяет хранить несколько
+версий массива, используя общие неизменяемые поддеревья.
+При обновлении создаются только новые вершины на пути
+от корня до изменяемого элемента (Path Copying).
+
+Поддерживаются точечное присваивание, запрос суммы на
+отрезке и копирование произвольной версии массива.
+
+\begin{lstlisting}[style=cpp]
+	struct node{
+		node *left, *right;
+		ll sum;
+		
+		node(){
+			left = nullptr;
+			right = nullptr;
+			sum = 0;
+		}
+	};
+	
+	struct per_segtree{
+		vector<node*> roots;
+		ll size;
+		
+		void build(vector<ll> &ar, node *now, ll lx, ll rx){
+			if (rx - lx == 1){
+				now->sum = ar[lx];
+				return;
+			}
+			
+			if (now->left == nullptr){
+				now->left = new node();
+			}
+			
+			if (now->right == nullptr){
+				now->right = new node();
+			}
+			
+			build(ar, now->left, lx, (lx + rx) / 2);
+			build(ar, now->right, (lx + rx) / 2, rx);
+			
+			now->sum = now->left->sum + now->right->sum;
+		}
+		
+		void build(vector<ll> &ar){
+			size = ar.size();
+			roots.push_back(new node());
+			build(ar, roots.back(), 0, size);
+		}
+		
+		ll get(ll l, ll r, node *now, ll lx, ll rx){
+			if (r <= lx || rx <= l){
+				return 0;
+			}
+			
+			if (lx >= l && rx <= r){
+				return now->sum;
+			}
+			
+			return get(l, r, now->left, lx, (lx + rx) / 2)
+			+ get(l, r, now->right, (lx + rx) / 2, rx);
+		}
+		
+		ll get(ll l, ll r, ll k){
+			return get(l, r, roots[k], 0, size);
+		}
+		
+		node* set(ll i, ll v, node *now, ll lx, ll rx){
+			node *res = new node();
+			
+			res->left = now->left;
+			res->right = now->right;
+			
+			if (rx - lx == 1){
+				res->sum = v;
+				return res;
+			}
+			
+			if (i < (lx + rx) / 2){
+				res->left = set(i, v, now->left, lx, (lx + rx) / 2);
+			}
+			else{
+				res->right = set(i, v, now->right, (lx + rx) / 2, rx);
+			}
+			
+			res->sum = res->left->sum + res->right->sum;
+			return res;
+		}
+		
+		void set(ll i, ll v, ll k){
+			roots[k] = set(i, v, roots[k], 0, size);
+		}
+		
+		void add_copy(ll k){
+			roots.push_back(roots[k]);
+		}
+	};
+\end{lstlisting}
+
+\complexity{Build: $O(n)$; point assignment: $O(\log n)$;
+	range sum: $O(\log n)$; version copy: $O(1)$.}
+
+\textbf{Memory:} $O(n+q\log n+c)$, where $q$ is the
+number of updates and $c$ is the number of copied versions.
+
+\subsection*{Random XOR Hashing}
+
+\begin{lstlisting}[style=cpp]
+	mt19937_64 rnd_gen(
+	chrono::steady_clock::now().time_since_epoch().count()
+	);
+	
+	using ull = unsigned long long;
+	
+	unordered_map<ll, ull> xor_values;
+	
+	ull get_xor_value(ll x) {
+		auto it = xor_values.find(x);
+		
+		if (it != xor_values.end()) {
+			return it->second;
+		}
+		
+		return xor_values[x] = rnd_gen();
+	}
+\end{lstlisting}
+
+\subsection*{Random Integer}
+
+\begin{lstlisting}[style=cpp]
+	ll random_int(ll l, ll r) {
+		assert(l <= r);
+		return uniform_int_distribution<ll>(l, r)(rnd_gen);
+	}
+\end{lstlisting}
+
+\subsection*{Random Real}
+
+\begin{lstlisting}[style=cpp]
+	ld random_real(ld l, ld r) {
+		assert(l <= r);
+		
+		if (l == r) return l;
+		
+		return uniform_real_distribution<ld>(l, r)(rnd_gen);
+	}
+\end{lstlisting}
+
+
+\end{document}
